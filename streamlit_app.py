@@ -123,7 +123,7 @@ if "players_df" not in st.session_state:
 if "enemies_df" not in st.session_state:
   st.session_state.enemies_df = pd.DataFrame(ENEMY_DATA)
 
-left_col, right_col = st.columns(2)
+left_col, right_col = st.columns(2, wrap=False)
 
 with left_col:
   st.subheader("Players")
