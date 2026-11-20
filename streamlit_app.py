@@ -294,3 +294,91 @@ if "players_df" in st.session_state and "enemies_df" in st.session_state:
         hide_index=True,
         use_container_width=True,
     )
+
+
+def simulate_max_battles(
+    players_eff_df,
+    enemies_eff_df,
+    attacks_per_player=5,
+    reset_threshold=43,
+):
+  """Simulates max wins and points from weakest to strongest clan player."""
+  clan_sorted = players_eff_df.sort_values(
+      "Effective Power", ascending=True
+  ).reset_index(drop=True)
+  enemies_reset = enemies_eff_df.reset_index(drop=True)
+  num_enemies = len(enemies_reset)
+
+  beaten_mask = [False] * num_enemies
+  cycle_beaten_count = 0
+  cycles_completed = 0
+
+  total_wins = 0
+  total_points = 0.0
+  battle_log = []
+
+  for _, p_row in clan_sorted.iterrows():
+    p_name = p_row["Player Name"]
+    p_power = float(p_row["Effective Power"])
+
+    for _ in range(attacks_per_player):
+      candidates = []
+      for idx, e_row in enemies_reset.iterrows():
+        if not beaten_mask[idx] and float(e_row["Effective Power"]) <= p_power:
+          candidates.append((idx, float(e_row["Effective Power"])))
+
+      if not candidates:
+        break
+
+      # Strongest winnable enemy first
+      candidates.sort(key=lambda x: x[1], reverse=True)
+      chosen_idx, _ = candidates[0]
+      e_row = enemies_reset.loc[chosen_idx]
+
+      beaten_mask[chosen_idx] = True
+      cycle_beaten_count += 1
+      total_wins += 1
+
+      pts = float(e_row["Points"]) if "Points" in e_row else 0.0
+      total_points += pts
+
+      battle_log.append({
+          "Battle #": total_wins,
+          "Cycle": cycles_completed + 1,
+          "Clan Player": p_name,
+          "Player Eff Power": format_si_3sf(p_power),
+          "Enemy": e_row["Player Name"],
+          "Enemy Eff Power": format_si_3sf(float(e_row["Effective Power"])),
+          "Points Gained": pts,
+      })
+
+      if cycle_beaten_count >= reset_threshold:
+        beaten_mask = [False] * num_enemies
+        cycle_beaten_count = 0
+        cycles_completed += 1
+
+  return {
+      "total_wins": total_wins,
+      "max_possible_battles": len(clan_sorted) * attacks_per_player,
+      "total_points": total_points,
+      "cycles_completed": cycles_completed,
+      "log_df": pd.DataFrame(battle_log),
+  }
+
+
+st.subheader("🏆 Theoretical Max Points (250 Battles / 43-Enemy Reset)")
+
+if st.button("Run Theoretical Max Simulation"):
+  sim = simulate_max_battles(
+      players_eff, enemies_eff, attacks_per_player=5, reset_threshold=43
+  )
+
+  m1, m2, m3 = st.columns(3, wrap=False)
+  m1.metric("Total Wins", f"{sim['total_wins']} / {sim['max_possible_battles']}")
+  m2.metric("Theoretical Max Points", f"{sim['total_points']:,.0f}")
+  m3.metric("Full 43-Enemy Resets", sim["cycles_completed"])
+
+  if not sim["log_df"].empty:
+    st.dataframe(sim["log_df"], hide_index=True, use_container_width=True)
+  else:
+    st.warning("No battles can be won with the current powers and levels.") 
