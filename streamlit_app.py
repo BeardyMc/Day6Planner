@@ -1,4 +1,5 @@
 import pandas as pd
+import math
 import streamlit as st
 
 
@@ -200,6 +201,65 @@ def calc_effective_power(df, damage_lvl, health_lvl):
   out["Effective Power"] = out["Power (b)"] * multiplier
   return out 
 
+def format_si_3sf(value):
+  """Formats a number to 3 significant figures with custom unit suffixes.
+
+  Examples:
+      1         -> "1b"
+      1000      -> "1t"
+      1000000   -> "1q"
+      0.1       -> "10m"
+      0.00771   -> "7.71m"
+  """
+  if value is None or math.isnan(value):
+    return "0b"
+  if value == 0:
+    return "0b"
+
+  sign = "-" if value < 0 else ""
+  abs_val = abs(float(value))
+
+  # Units mapped by powers of 10 relative to 1 ("b" = 10^0)
+  # Adjust or expand this table if your game uses other letters!
+  units = [
+      (12, "T"),  # trillions of b (optional)
+      (9, "B"),  # billions of b (optional)
+      (6, "q"),  # 1,000,000 = 1q (10^6)
+      (3, "t"),  # 1,000 = 1t (10^3)
+      (0, "b"),  # 1 = 1b (10^0)
+      (-3, "m"),  # 0.001 = 1m, 0.1 = 100m (10^-3)
+  ]
+
+  # Pick the largest unit step at or below abs_val
+  chosen_exp, suffix = 0, "b"
+  for exp, unit in units:
+    if abs_val >= 10**exp:
+      chosen_exp, suffix = exp, unit
+      break
+
+  # Scale value into the chosen unit
+  scaled = abs_val / (10**chosen_exp)
+
+  # Round to 3 significant figures
+  sf_scaled = round(scaled, 3 - 1 - math.floor(math.log10(scaled)))
+
+  # Guard against rounding 999.9 -> 1000 stepping into the next tier
+  if sf_scaled >= 1000 and chosen_exp < 12:
+    # Re-run at the next 10^3 step up if available
+    next_exp = chosen_exp + 3
+    for exp, unit in units:
+      if exp == next_exp:
+        scaled = abs_val / (10**exp)
+        sf_scaled = round(scaled, 3 - 1 - math.floor(math.log10(scaled)))
+        suffix = unit
+        break
+
+  # Format cleanly to 3 significant figures without trailing zeros
+  # e.g. 1.0 -> "1", 10.0 -> "10", 7.71 -> "7.71", 123.0 -> "123"
+  formatted_num = f"{sf_scaled:.3g}"
+  return f"{sign}{formatted_num}{suffix}"
+
+
 # nested in an if in case user breaks data in editable boxes. 
 if "players_df" in st.session_state and "enemies_df" in st.session_state:
   players_eff = calc_effective_power(
@@ -222,11 +282,10 @@ if "players_df" in st.session_state and "enemies_df" in st.session_state:
 
     st.metric(
         label=f"{selected_player}'s Effective Power",
-        value=f"{my_eff_power:,.2f}",
+        value=format_si_3sf(my_eff_power),
     )
 
-    # Placeholder condition: enemies whose Effective Power is <= yours.
-    # Swap this condition once we have the rest of your sentence!
+
     winnable_enemies = enemies_eff[enemies_eff["Effective Power"] <= my_eff_power]
 
     st.write(f"**Battleable Enemies ({len(winnable_enemies)}):**")
