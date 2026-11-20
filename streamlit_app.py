@@ -4,6 +4,8 @@ import streamlit as st
 
 st.title("Day 6 PvP planner")
 
+st.write("Below are all player's powers, if you notice any power discrepancies vs in game data, you can edit it here, but please tell Beardy so that he can edit it for all of us.")
+
 PLAYERS_DATA = [
     {"Points": 50, "Player Name": "Mypleasure", "Power (b)": 17000},
     {"Points": 49, "Player Name": "Kitty87", "Power (b)": 2070},
