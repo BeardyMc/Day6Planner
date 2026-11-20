@@ -189,3 +189,49 @@ with col2:
         key="enemy_health_lvl",
     )
 
+
+## EFFECTIVE DAY 6 POWER
+def calc_effective_power(df, damage_lvl, health_lvl):
+  """Computes Effective Power = Power (b) * (1 + (damage + health) / 2)."""
+  out = df.copy()
+  dmg = damage_lvl or 0
+  hp = health_lvl or 0
+  multiplier = 1.0 + (dmg + hp) / 2.0
+  out["Effective Power"] = out["Power (b)"] * multiplier
+  return out 
+
+# nested in an if in case user breaks data in editable boxes. 
+if "players_df" in st.session_state and "enemies_df" in st.session_state:
+  players_eff = calc_effective_power(
+      st.session_state.players_df, our_damage_lvl, our_health_lvl
+  )
+  enemies_eff = calc_effective_power(
+      st.session_state.enemies_df, enemy_damage_lvl, enemy_health_lvl
+  )
+
+  st.subheader("⚔️ Select Your Player & Find Matchups")
+
+  clan_names = players_eff["Player Name"].dropna().tolist()
+  selected_player = st.selectbox("Who are you?", options=clan_names)
+
+  if selected_player:
+    player_row = players_eff[players_eff["Player Name"] == selected_player].iloc[
+        0
+    ]
+    my_eff_power = float(player_row["Effective Power"])
+
+    st.metric(
+        label=f"{selected_player}'s Effective Power",
+        value=f"{my_eff_power:,.2f}",
+    )
+
+    # Placeholder condition: enemies whose Effective Power is <= yours.
+    # Swap this condition once we have the rest of your sentence!
+    winnable_enemies = enemies_eff[enemies_eff["Effective Power"] <= my_eff_power]
+
+    st.write(f"**Battleable Enemies ({len(winnable_enemies)}):**")
+    st.dataframe(
+        winnable_enemies[["Player Name", "Power (b)", "Effective Power"]],
+        hide_index=True,
+        use_container_width=True,
+    )
