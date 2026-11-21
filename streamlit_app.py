@@ -28,13 +28,15 @@ def increment_visit_counter(plus_one):
     current_count = int(record.get("visits", 0))
     new_count = current_count + plus_one
 
-    put_resp = requests.put(
-        url,
-        headers=headers,
-        json={"visits": new_count},
-        timeout=5,
-    )
-    put_resp.raise_for_status()
+    if plus_one != 0:
+      put_resp = requests.put(
+          url,
+          headers=headers,
+          json={"visits": new_count},
+          timeout=5,
+      )
+      put_resp.raise_for_status()
+
     return new_count
   except Exception as exc:
     print(f"JSONBin visit counter error: {exc}", flush=True)
@@ -332,18 +334,24 @@ def build_cycle_summary_tables(
 # 2. DATA & UI DISPLAY
 # ==========================================
 
+# if creator, don't count me as a visitor and let me know how many others have used it. 
 ignore_key = st.secrets.get("IGNORE_VISIT_KEY", "")
 is_ignored_visitor = bool(ignore_key) and st.query_params.get("key") == ignore_key
 
 if "active" not in st.session_state:
   st.session_state.active = True
-  if not is_ignored_visitor:
-    st.session_state.visit_count = increment_visit_counter(1)
-  else:
-    st.session_state.visit_count = increment_visit_counter(0)
+  st.session_state.visit_count = increment_visit_counter(
+      0 if is_ignored_visitor else 1
+  )
 
 if is_ignored_visitor:
-  st.caption(f"🔧 Creator mode active \n\nUsers so far: {st.session_state.visit_count}")
+  count_display = (
+      st.session_state.visit_count
+      if st.session_state.visit_count is not None
+      else "Unavailable"
+  )
+  st.caption(f"🔧 Creator mode active\n\nUsers so far: {count_display}")
+
 
 st.title("Day 6 PvP planner")
 
