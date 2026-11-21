@@ -624,49 +624,57 @@ enemies_eff = calc_effective_power(
 players_eff = assign_rank_points(players_eff, power_col="Effective Power")
 enemies_eff = assign_rank_points(enemies_eff, power_col="Effective Power")
 
+st.subheader("⚔️ Select Your Player & Find Matchups")
 
-# UNNEST THIS LOOP, REDUDANT IF
-if True:
+valid_players_eff = players_eff[
+    players_eff["Player Name"].notna()
+    & (players_eff["Player Name"].astype(str).str.strip() != "")
+].copy()
+clan_names = valid_players_eff["Player Name"].tolist()
+selected_player = st.selectbox("Who are you?", options=clan_names)
 
-  st.subheader("⚔️ Select Your Player & Find Matchups")
+safety_margin_pct = st.slider(
+    "Target Safety Margin (% of Attacker Effective Power) \n\n(aka how good"
+    " is your build vs theirs):",
+    min_value=50,
+    max_value=150,
+    value=90,
+    step=1,
+    key="safety_margin_pct",
+)
+safety_margin = (
+    float(safety_margin_pct if safety_margin_pct is not None else 100.0)
+    / 100.0
+)
 
-  clan_names = players_eff["Player Name"].dropna().tolist()
-  selected_player = st.selectbox("Who are you?", options=clan_names)
-
-  safety_margin_pct = st.slider(
-      "Target Safety Margin (% of Attacker Effective Power) \n\n(aka how good"
-      " is your build vs theirs):",
-      min_value=50,
-      max_value=150,
-      value=90,
-      step=1,
-      key="safety_margin_pct",
-  )
-  safety_margin = (
-      float(safety_margin_pct if safety_margin_pct is not None else 100.0)
-      / 100.0
-  )
-
-  if selected_player:
-    player_row = players_eff[players_eff["Player Name"] == selected_player].iloc[
-        0
-    ]
-    my_eff_power = float(player_row["Effective Power"])
+if selected_player:
+  player_matches = valid_players_eff[
+      valid_players_eff["Player Name"] == selected_player
+  ]
+  if not player_matches.empty:
+    player_row = player_matches.iloc[0]
+    my_eff_power = float(
+        pd.to_numeric(player_row["Effective Power"], errors="coerce") or 0.0
+    )
     max_target_power = my_eff_power * safety_margin
+    enemy_mult = 1.0 + ((enemy_damage_lvl or 0) + (enemy_health_lvl or 0)) / 2.0
 
     st.metric(
         label=f"{selected_player}'s Effective Power",
         value=format_si_3sf(my_eff_power),
         delta=(
             "Safe target cap:"
-            f" {format_si_3sf(max_target_power/(1+(enemy_damage_lvl+enemy_health_lvl)/2))}"
+            f" {format_si_3sf(max_target_power / enemy_mult)}"
             f" ({safety_margin_pct:.0f}%)"
         ),
         delta_color="off",
     )
 
     winnable_enemies = enemies_eff[
-        enemies_eff["Effective Power"] <= (my_eff_power * safety_margin)
+        pd.to_numeric(enemies_eff["Effective Power"], errors="coerce").fillna(
+            math.inf
+        )
+        <= max_target_power
     ]
 
     st.write(f"**Battleable Enemies ({len(winnable_enemies)}):**")
@@ -677,6 +685,7 @@ if True:
         hide_index=True,
         use_container_width=True,
     )
+
 
 st.subheader("🏆 Theoretical Max Points (250 Battles / 43-Enemy Reset)")
 
