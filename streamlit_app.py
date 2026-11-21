@@ -192,13 +192,16 @@ def simulate_battles(
       "log_df": pd.DataFrame(battle_log),
   }
 
-def build_cycle_summary_tables(log_df, defenders_df, attackers_df):
+def build_cycle_summary_tables(
+    log_df, defenders_df, attackers_df, attacks_per_player=5
+):
   """Builds two summary tables from a simulation `log_df`:
 
-  1. `enemy_cycles_df`: For each defender ("Enemy"), shows which attacker
+  1. `enemy_cycles_df`: For each defender ("Defender"), shows which attacker
      ("Attacker") beats them in each Cycle (`Cycle 1`, `Cycle 2`, ...).
   2. `attacker_targets_df`: For each attacker ("Attacker"), lists their
-     assigned defenders formatted as `"Defender (Cycle X)"`.
+     assigned defenders across columns `"Battle 1"`, `"Battle 2"`, ...
+     formatted as `"Defender (Cycle X)"`.
   """
   defender_names = (
       defenders_df["Player Name"].dropna().tolist()
@@ -211,22 +214,31 @@ def build_cycle_summary_tables(log_df, defenders_df, attackers_df):
       else []
   )
 
+  battle_cols = [f"Battle {i}" for i in range(1, attacks_per_player + 1)]
+
   if log_df is None or log_df.empty:
     empty_enemies = pd.DataFrame({"Defender": defender_names})
-    empty_attackers = pd.DataFrame({
-        "Attacker": attacker_names,
-        "Assigned Defenders": ["" for _ in attacker_names],
-    })
+    empty_attackers = pd.DataFrame([
+        {
+            "Attacker": a,
+            "Attacks Used": 0,
+            **{col: "" for col in battle_cols},
+        }
+        for a in attacker_names
+    ])
     return empty_enemies, empty_attackers
 
-  # Preserve appearance order of cycles and names
   cycles = sorted(log_df["Cycle"].dropna().unique().tolist())
   cycle_cols = [f"Cycle {int(c)}" for c in cycles]
 
-  all_defenders = list(dict.fromkeys(defender_names + log_df["Defender"].dropna().tolist()))
+  all_defenders = list(
+      dict.fromkeys(defender_names + log_df["Defender"].dropna().tolist())
+  )
   enemy_rows = {d: {col: "" for col in cycle_cols} for d in all_defenders}
 
-  all_attackers = list(dict.fromkeys(attacker_names + log_df["Attacker"].dropna().tolist()))
+  all_attackers = list(
+      dict.fromkeys(attacker_names + log_df["Attacker"].dropna().tolist())
+  )
   attacker_entries = {a: [] for a in all_attackers}
 
   for _, row in log_df.iterrows():
@@ -242,24 +254,40 @@ def build_cycle_summary_tables(log_df, defenders_df, attackers_df):
       else:
         enemy_rows[dfnd][cyc_col] = att
 
-    # Table 2: Who each attacker is up against, formatted as "Defender (Cycle)"
+    # Table 2: Who each attacker is up against, formatted as "Defender (Cycle X)"
     if att in attacker_entries:
       attacker_entries[att].append(f"{dfnd} (Cycle {cyc})")
 
   enemy_records = [{"Defender": d, **enemy_rows[d]} for d in all_defenders]
   enemy_cycles_df = pd.DataFrame(enemy_records)
 
-  attacker_records = [
-      {
-          "Attacker": a,
-          "Attacks Used": len(attacker_entries[a]),
-          "Assigned Defenders": ", ".join(attacker_entries[a]),
-      }
-      for a in all_attackers
-  ]
+  # Dynamically size Battle columns to at least `attacks_per_player`
+  max_battles = max(
+      attacks_per_player,
+      max((len(v) for v in attacker_entries.values()), default=0),
+  )
+  battle_cols = [f"Battle {i}" for i in range(1, max_battles + 1)]
+
+  attacker_records = []
+  for a in all_attackers:
+    battles = attacker_entries[a]
+    battle_dict = {
+        f"Battle {i + 1}": (battles[i] if i < len(battles) else "")
+        for i in range(max_battles)
+    }
+    attacker_records.append({
+        "Attacker": a,
+        "Attacks Used": len(battles),
+        **battle_dict,
+    })
+
   attacker_targets_df = pd.DataFrame(attacker_records)
 
   return enemy_cycles_df, attacker_targets_df
+
+
+
+ 
 
 
 
