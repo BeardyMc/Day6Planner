@@ -332,9 +332,18 @@ def build_cycle_summary_tables(
 # 2. DATA & UI DISPLAY
 # ==========================================
 
+ignore_key = st.secrets.get("IGNORE_VISIT_KEY", "")
+is_ignored_visitor = bool(ignore_key) and st.query_params.get("key") == ignore_key
+
 if "active" not in st.session_state:
   st.session_state.active = True
-  st.session_state.visit_count = increment_visit_counter()
+  if not is_ignored_visitor:
+    st.session_state.visit_count = increment_visit_counter()
+  else:
+    st.session_state.visit_count = None
+
+if is_ignored_visitor:
+  st.caption("🔧 Creator mode active")
 
 st.title("Day 6 PvP planner")
 
