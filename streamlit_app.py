@@ -345,12 +345,13 @@ def simulate_max_battles(
       battle_log.append({
           "Battle #": total_wins,
           "Cycle": cycles_completed + 1,
-          "Clan Player": p_name,
-          "Player Eff Power": format_si_3sf(p_power),
-          "Enemy": e_row["Player Name"],
-          "Enemy Eff Power": format_si_3sf(float(e_row["Effective Power"])),
+          "Attacker": p_name,
+          "Attacker Eff Power": format_si_3sf(p_power),
+          "Defender": e_row["Player Name"],
+          "Defender Eff Power": format_si_3sf(float(e_row["Effective Power"])),
           "Points Gained": pts,
       })
+
 
       if cycle_beaten_count >= reset_threshold:
         beaten_mask = [False] * num_enemies
@@ -382,3 +383,20 @@ if st.button("Run Theoretical Max Simulation"):
     st.dataframe(sim["log_df"], hide_index=True, use_container_width=True)
   else:
     st.warning("No battles can be won with the current powers and levels.") 
+
+  sim_enemy = simulate_max_battles(
+      enemies_eff, players_eff, attacks_per_player=5, reset_threshold=43
+  )
+
+  e1, e2, e3 = st.columns(3, wrap=False)
+  e1.metric(
+      "Enemy Wins vs Us",
+      f"{sim_enemy['total_wins']} / {sim_enemy['max_possible_battles']}",
+  )
+  e2.metric("Points Enemies Could Score", f"{sim_enemy['total_points']:,.0f}")
+  e3.metric("Full 43-Defeat Resets", sim_enemy["cycles_completed"])
+
+  if not sim_enemy["log_df"].empty:
+    st.dataframe(sim_enemy["log_df"], hide_index=True, use_container_width=True)
+  else:
+    st.success("Enemies can't beat any of our players with current stats!")
