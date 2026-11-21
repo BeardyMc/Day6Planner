@@ -299,7 +299,7 @@ if "players_df" in st.session_state and "enemies_df" in st.session_state:
     st.metric(
         label=f"{selected_player}'s Effective Power",
         value=format_si_3sf(my_eff_power),
-        delta=f"Safe target cap: {format_si_3sf(max_target_power)} ({safety_margin_pct:.0f}%)",
+        delta=f"Safe target cap: {format_si_3sf(max_target_power/(1+(enemy_damage_lvl+enemy_health_lvl)/2)} ({safety_margin_pct:.0f}%)",
         delta_color="off",
     )
 
