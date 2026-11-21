@@ -450,6 +450,62 @@ def _filter_active_entries(entries):
   ]
 
 
+def save_rosters_to_github(
+    players_df, enemies_df, commit_message="Update PvP rosters"
+):
+  """Pushes `players_df` and `enemies_df` to the GitHub JSON file."""
+  token, repo, path, branch = _get_github_config()
+  if not token or not repo:
+    return False, "Missing GITHUB_TOKEN or GITHUB_REPO in secrets."
+
+  url = f"https://api.github.com/repos/{repo}/contents/{path}"
+  headers = {
+      "Authorization": f"Bearer {token}",
+      "Accept": "application/vnd.github+json",
+  }
+
+  try:
+    # Fetch latest file SHA first so GitHub accepts the update
+    get_resp = requests.get(
+        url, headers=headers, params={"ref": branch}, timeout=10
+    )
+    get_resp.raise_for_status()
+    current_sha = get_resp.json()["sha"]
+
+    clean_players = (
+        players_df.dropna(how="all")
+        if players_df is not None
+        else pd.DataFrame()
+    )
+    clean_enemies = (
+        enemies_df.dropna(how="all")
+        if enemies_df is not None
+        else pd.DataFrame()
+    )
+
+    roster_payload = {
+        "players": clean_players.to_dict(orient="records"),
+        "enemies": clean_enemies.to_dict(orient="records"),
+    }
+    encoded_content = base64.b64encode(
+        json.dumps(roster_payload, indent=2).encode("utf-8")
+    ).decode("utf-8")
+
+    put_body = {
+        "message": commit_message,
+        "content": encoded_content,
+        "sha": current_sha,
+        "branch": branch,
+    }
+    put_resp = requests.put(url, headers=headers, json=put_body, timeout=10)
+    put_resp.raise_for_status()
+    return True, f"Pushed rosters to `{path}` on `{branch}`."
+  except Exception as exc:
+    print(f"GitHub push error: {exc}", flush=True)
+    return False, f"GitHub push failed: {exc}"
+
+
+
 # ==========================================
 # 2. DATA & UI DISPLAY
 # ==========================================
@@ -529,9 +585,6 @@ if "players_df" not in st.session_state or "enemies_df" not in st.session_state:
   st.session_state.enemies_df = pd.DataFrame(active_enemies)
 
 
-
-
-
 DISPLAY_COLS = ["Rank", "Player Name", "Power (b)"]
 
 left_col, right_col = st.columns(2, wrap=False)
@@ -546,12 +599,6 @@ with left_col:
       key="players_editor",
   )
   st.session_state.players_df = edited_players
-#  st.caption("Formatted Powers Preview:")
-#  st.dataframe(
-#      format_df_powers(st.session_state.players_df[DISPLAY_COLS]),
-#      hide_index=True,
-#      use_container_width=True,
-#  )
 
 with right_col:
   st.subheader("Enemies")
@@ -563,12 +610,61 @@ with right_col:
       key="enemies_editor",
   )
   st.session_state.enemies_df = edited_enemies
-#  st.caption("Formatted Powers Preview:")
-#  st.dataframe(
-#      format_df_powers(st.session_state.enemies_df[DISPLAY_COLS]),
-#      hide_index=True,
-#      use_container_width=True,
-#  )
+
+
+## PUSH TO SAVE FILE
+if "push_unlocked" not in st.session_state:
+  st.session_state.push_unlocked = False
+
+with st.expander("Save / Push Rosters to GitHub", expanded=False):
+  expected_push_pwd = st.secrets.get("PUSH_PASSWORD", "")
+
+  if not st.session_state.push_unlocked:
+    with st.form("push_auth_form", clear_on_submit=True):
+      entered_pwd = st.text_input("Push Password", type="password")
+      unlock_clicked = st.form_submit_button("Unlock Push")
+      if unlock_clicked:
+        if expected_push_pwd and entered_pwd == expected_push_pwd:
+          st.session_state.push_unlocked = True
+          st.rerun()
+        else:
+          st.error("Incorrect push password.")
+  else:
+    st.caption(
+        "If updating player power, please leave a message for what and why you"
+        " edited."
+    )
+    commit_msg_input = st.text_input(
+        "Commit Message",
+        placeholder="e.g. Updated PlayerOne93 power to 220t for Day 6",
+        key="roster_commit_msg_input",
+    )
+    final_commit_msg = (
+        commit_msg_input.strip()
+        if commit_msg_input and commit_msg_input.strip()
+        else "Update PvP rosters from planner"
+    )
+
+    col_push, col_lock = st.columns([3, 1], vertical_alignment="bottom")
+    with col_push:
+      if st.button(
+          "Push Rosters to GitHub", key="push_rosters_btn", width="stretch"
+      ):
+        ok, msg = save_rosters_to_github(
+            st.session_state.players_df,
+            st.session_state.enemies_df,
+            commit_message=final_commit_msg,
+        )
+        if ok:
+          st.success(msg)
+        else:
+          st.error(msg)
+    with col_lock:
+      if st.button("Lock", key="lock_push_btn", width="stretch"):
+        st.session_state.push_unlocked = False
+        st.rerun()
+ 
+ 
 
 ## BRAWL TECH
 col1, col2 = st.columns(2, wrap=False)
@@ -588,7 +684,7 @@ with col1:
         "Our Health Lvl",
         min_value=0,
         max_value=100,
-        value=73,
+        value=80,
         step=1,
         key="our_health_lvl",
     )
