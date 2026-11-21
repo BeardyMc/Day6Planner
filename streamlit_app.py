@@ -1,10 +1,46 @@
 import math
 import pandas as pd
+import requests
 import streamlit as st
 
 # ==========================================
 # 1. HELPER FUNCTIONS
 # ==========================================
+
+def increment_visit_counter():
+  """Increments a visit counter in JSONBin once per Streamlit session."""
+  try:
+    api_key = st.secrets["JSONBIN_API_KEY"]
+    bin_id = st.secrets["BIN_ID"]
+  except (KeyError, FileNotFoundError):
+    return None
+
+  url = f"https://api.jsonbin.io/v3/b/{bin_id}"
+  headers = {
+      "X-Master-Key": api_key,
+      "Content-Type": "application/json",
+  }
+
+  try:
+    get_resp = requests.get(url, headers={"X-Master-Key": api_key}, timeout=5)
+    get_resp.raise_for_status()
+    record = get_resp.json().get("record", {})
+    current_count = int(record.get("visits", 0))
+    new_count = current_count + 1
+
+    put_resp = requests.put(
+        url,
+        headers=headers,
+        json={"visits": new_count},
+        timeout=5,
+    )
+    put_resp.raise_for_status()
+    return new_count
+  except Exception as exc:
+    print(f"JSONBin visit counter error: {exc}", flush=True)
+    return None
+
+
 def calc_effective_power(df, damage_lvl, health_lvl):
   """Computes Effective Power = Power (b) * (1 + (damage + health) / 2)."""
   out = df.copy()
@@ -192,6 +228,7 @@ def simulate_battles(
       "log_df": pd.DataFrame(battle_log),
   }
 
+
 def build_cycle_summary_tables(
     log_df, defenders_df, attackers_df, attacks_per_player=5
 ):
@@ -294,6 +331,11 @@ def build_cycle_summary_tables(
 # ==========================================
 # 2. DATA & UI DISPLAY
 # ==========================================
+
+if "active" not in st.session_state:
+  st.session_state.active = True
+  st.session_state.visit_count = increment_visit_counter()
+
 st.title("Day 6 PvP planner")
 
 st.write(
