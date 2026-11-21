@@ -286,7 +286,7 @@ if "players_df" in st.session_state and "enemies_df" in st.session_state:
     step=1,
     key="safety_margin_pct",
   )
-  safety_margin = float((safety_margin_pct if safety_margin_pct is not None else 100.0) / 100.0
+  safety_margin = float(safety_margin_pct if safety_margin_pct is not None else 100.0)/ 100.0
 
   if selected_player:
     player_row = players_eff[players_eff["Player Name"] == selected_player].iloc[
