@@ -369,7 +369,7 @@ def simulate_battles(
       break
 
     # Sort this cycle's chosen battles weakest-attacker-first for clean execution order
-    cycle_matches.sort(key=lambda m: m["attacker_power"])
+    # cycle_matches.sort(key=lambda m: m["attacker_power"])
 
     for m in cycle_matches:
       total_wins += 1
