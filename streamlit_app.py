@@ -426,7 +426,7 @@ if st.button("Run Theoretical Max Simulation"):
     st.warning("No battles can be won with the current powers and levels.")
 
   st.divider()
-  st.subheader("🛡️ Expected Enemy Attacks Against Us (Independent)")
+  st.subheader("🛡️ Possible Enemy Wins")
 
   sim_enemy = simulate_battles(
       enemies_eff,
