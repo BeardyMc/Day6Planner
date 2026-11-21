@@ -375,7 +375,7 @@ if is_ignored_visitor:
   st.caption(f"🔧 Creator mode active\n\nUsers so far: {count_display}")
 
   with st.expander("Creator Counter Controls", expanded=False):
-    col_val, col_btn = st.columns([2, 1], wrap=False)
+    col_val, col_btn, col_rst= st.columns([2, 1, 1], wrap=False)
     with col_val:
       override_val = st.number_input(
           "Set Visit Counter To",
@@ -393,14 +393,14 @@ if is_ignored_visitor:
           st.rerun()
         else:
           st.error("Failed to update counter in JSONBin.")
-
-    if st.button("Reset to 0", key="reset_visit_count_btn"):
-      updated = set_visit_count(0)
-      if updated is not None:
-        st.session_state.visit_count = updated
-        st.rerun()
-      else:
-        st.error("Failed to reset counter in JSONBin.")
+    with col_rst:
+      if st.button("Reset to 0", key="reset_visit_count_btn"):
+          updated = set_visit_count(0)
+          if updated is not None:
+            st.session_state.visit_count = updated
+            st.rerun()
+          else:
+            st.error("Failed to reset counter in JSONBin.")
 
 
 
