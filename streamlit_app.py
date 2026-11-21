@@ -723,9 +723,6 @@ if st.button("Run Theoretical Max Simulation"):
   else:
     st.success("Enemies can't beat any of our players with current stats!")
 
-  if not sim["log_df"].empty:
-    st.dataframe(sim["log_df"], hide_index=True, use_container_width=True)
-
     enemy_cycles_df, our_targets_df = build_cycle_summary_tables(
         sim["log_df"], enemies_eff, players_eff
     )
