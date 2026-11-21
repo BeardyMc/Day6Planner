@@ -261,7 +261,7 @@ def format_si_3sf(value):
 
 safety_margin_pct = st.number_input(
     "Target Safety Margin (% of Attacker Effective Power)",
-    min_value=0.0,
+    min_value=75.0,
     max_value=100.0,
     value=90.0,
     step=1.0,
@@ -449,7 +449,7 @@ if st.button("Run Theoretical Max Simulation"):
       players_eff,
       attacks_per_player=5,
       reset_threshold=43,
-      safety_margin=1.1
+      safety_margin=(1/safety_margin) 
   )
 
   e1, e2, e3 = st.columns(3, wrap=False)
