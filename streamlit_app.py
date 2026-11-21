@@ -723,13 +723,13 @@ if st.button("Run Theoretical Max Simulation"):
   else:
     st.success("Enemies can't beat any of our players with current stats!")
 
-    enemy_cycles_df, our_targets_df = build_cycle_summary_tables(
-        sim["log_df"], enemies_eff, players_eff
-    )
+  enemy_cycles_df, our_targets_df = build_cycle_summary_tables(
+      sim["log_df"], enemies_eff, players_eff
+  )
 
-    st.markdown("#### Who should target each Enemy by Cycle")
-    st.dataframe(enemy_cycles_df, hide_index=True, use_container_width=True)
+  st.markdown("#### Who should target each Enemy by Cycle")
+  st.dataframe(enemy_cycles_df, hide_index=True, use_container_width=True)
 
-    st.markdown("#### Our Players' Assigned Enemies")
-    st.dataframe(our_targets_df, hide_index=True, use_container_width=True)
+  st.markdown("#### Our Players' Assigned Enemies")
+  st.dataframe(our_targets_df, hide_index=True, use_container_width=True)
 
