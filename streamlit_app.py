@@ -375,7 +375,7 @@ if is_ignored_visitor:
   st.caption(f"🔧 Creator mode active\n\nUsers so far: {count_display}")
 
   with st.expander("Creator Counter Controls", expanded=False):
-    col_val, col_btn = st.columns([2, 1])
+    col_val, col_btn = st.columns([2, 1], wrap=False)
     with col_val:
       override_val = st.number_input(
           "Set Visit Counter To",
