@@ -611,7 +611,6 @@ with left_col:
 with right_col:
   enemy_total_power = format_si_3sf(sum_roster_power(st.session_state.enemies_df))
   st.subheader(f"Enemies: {enemy_total_power}") 
-  st.subheader("Enemies")
   edited_enemies = st.data_editor(
       st.session_state.enemies_df,
       column_order=DISPLAY_COLS,
