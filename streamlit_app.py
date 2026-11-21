@@ -259,7 +259,7 @@ def format_si_3sf(value):
   formatted_num = f"{sf_scaled:.3g}"
   return f"{sign}{formatted_num}{suffix}"
 
-safety_margin_pct = st.number_input(
+safety_margin_pct = st.slider(
     "Target Safety Margin (% of Attacker Effective Power)",
     min_value=75.0,
     max_value=100.0,
