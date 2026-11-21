@@ -300,90 +300,100 @@ def simulate_battles(
     defenders_df,
     attacks_per_player=5,
     reset_threshold=43,
-    optimize_for="points",  # "points" or "wins"
 ):
-  """Simulates battles from weakest to strongest attacker.
+  """Maximizes total points across reset cycles.
 
-  - Each attacker gets up to `attacks_per_player` battles.
-  - A defender can be beaten if `defender_eff_power <= attacker_eff_power` and
-    is currently unbeaten in the active cycle.
-  - When `optimize_for="points"`, picks the highest-Points winnable defender
-    first (tie-breaking by highest Effective Power).
-  - When `optimize_for="wins"`, picks the highest-Effective-Power winnable
-    defender first.
-  - Resets the beaten defender pool after `reset_threshold` defeats in a cycle.
+  In each cycle of up to `reset_threshold` defeats:
+  - Evaluates defenders from highest Points to lowest Points.
+  - Assigns the weakest available attacker (with attacks remaining and
+    attacker_eff_power >= defender_eff_power) to each high-value target.
+  - Stops the cycle at `reset_threshold` wins (triggering a full reset),
+    or earlier if no remaining attacker can beat any remaining target.
   """
-  attackers_sorted = attackers_df.sort_values(
-      "Effective Power", ascending=True
+  attackers = attackers_df.copy().reset_index(drop=True)
+  attackers["eff_power"] = attackers["Effective Power"].astype(float)
+  attackers["attacks_left"] = attacks_per_player
+
+  # Sort defenders by highest Points first, tie-breaking by Effective Power
+  defenders = defenders_df.copy()
+  defenders["eff_power"] = defenders["Effective Power"].astype(float)
+  defenders["pts"] = (
+      defenders["Points"].astype(float) if "Points" in defenders.columns else 0.0
+  )
+  defenders = defenders.sort_values(
+      by=["pts", "eff_power"], ascending=[False, False]
   ).reset_index(drop=True)
-  defenders_reset = defenders_df.reset_index(drop=True)
-  num_defenders = len(defenders_reset)
 
-  if attackers_sorted.empty or num_defenders == 0:
-    return {
-        "total_wins": 0,
-        "max_possible_battles": len(attackers_sorted) * attacks_per_player,
-        "total_points": 0.0,
-        "cycles_completed": 0,
-        "log_df": pd.DataFrame(),
-    }
-
-  beaten_mask = [False] * num_defenders
-  cycle_beaten_count = 0
-  cycles_completed = 0
-
+  max_possible_battles = len(attackers) * attacks_per_player
   total_wins = 0
   total_points = 0.0
+  cycles_completed = 0
+  cycle_num = 1
   battle_log = []
 
-  for _, a_row in attackers_sorted.iterrows():
-    a_name = a_row["Player Name"]
-    a_power = float(a_row["Effective Power"])
+  while attackers["attacks_left"].sum() > 0:
+    cycle_matches = []
 
-    for _ in range(attacks_per_player):
-      candidates = []
-      for idx, d_row in defenders_reset.iterrows():
-        d_power = float(d_row["Effective Power"])
-        d_pts = float(d_row["Points"]) if "Points" in d_row else 0.0
-        if not beaten_mask[idx] and d_power <= a_power:
-          candidates.append((idx, d_pts, d_power))
-
-      if not candidates:
+    # Try to claim the highest-point targets first (up to reset_threshold)
+    for _, d_row in defenders.iterrows():
+      if len(cycle_matches) >= reset_threshold:
         break
 
-      if optimize_for == "points":
-        # Maximize points first, then strongest defender power on ties
-        candidates.sort(key=lambda x: (x[1], x[2]), reverse=True)
-      else:
-        # Maximize target strength (wins mode)
-        candidates.sort(key=lambda x: (x[2], x[1]), reverse=True)
+      d_power = d_row["eff_power"]
+      d_pts = d_row["pts"]
 
-      chosen_idx, pts, d_power = candidates[0]
-      d_row = defenders_reset.loc[chosen_idx]
+      # Find all attackers who still have attacks left AND can beat this defender
+      eligible = attackers[
+          (attackers["attacks_left"] > 0) & (attackers["eff_power"] >= d_power)
+      ]
 
-      beaten_mask[chosen_idx] = True
-      cycle_beaten_count += 1
-      total_wins += 1
-      total_points += pts
+      if eligible.empty:
+        # Nobody remaining can beat this target; skip down to the next highest-point target
+        continue
 
-      battle_log.append({
-          "Battle #": total_wins,
-          "Cycle": cycles_completed + 1,
-          "Attacker": a_name,
-          "Attacker Eff Power": format_si_3sf(a_power),
-          "Defender": d_row["Player Name"],
-          "Defender Eff Power": format_si_3sf(d_power),
-          "Points Gained": pts,
+      # Pick the WEAKEST eligible attacker so top hitters stay free for top targets
+      chosen_idx = eligible["eff_power"].idxmin()
+      a_row = attackers.loc[chosen_idx]
+
+      attackers.at[chosen_idx, "attacks_left"] -= 1
+      cycle_matches.append({
+          "attacker_name": a_row["Player Name"],
+          "attacker_power": a_row["eff_power"],
+          "defender_name": d_row["Player Name"],
+          "defender_power": d_power,
+          "points": d_pts,
       })
 
-      if cycle_beaten_count >= reset_threshold:
-        beaten_mask = [False] * num_defenders
-        cycle_beaten_count = 0
-        cycles_completed += 1
+    # If zero matches could be made in this cycle, no valid battles remain anywhere
+    if not cycle_matches:
+      break
+
+    # Sort this cycle's chosen battles weakest-attacker-first for clean execution order
+    cycle_matches.sort(key=lambda m: m["attacker_power"])
+
+    for m in cycle_matches:
+      total_wins += 1
+      total_points += m["points"]
+      battle_log.append({
+          "Battle #": total_wins,
+          "Cycle": cycle_num,
+          "Attacker": m["attacker_name"],
+          "Attacker Eff Power": format_si_3sf(m["attacker_power"]),
+          "Defender": m["defender_name"],
+          "Defender Eff Power": format_si_3sf(m["defender_power"]),
+          "Points Gained": m["points"],
+      })
+
+    if len(cycle_matches) >= reset_threshold:
+      cycles_completed += 1
+      cycle_num += 1
+    else:
+      # Couldn't reach 43 wins to trigger another reset; all possible wins are exhausted
+      break
 
   return {
       "total_wins": total_wins,
-      "max_possible_battles": len(attackers_sorted) * attacks_per_player,
+      "max_possible_battles": max_possible_battles,
       "total_points": total_points,
       "cycles_completed": cycles_completed,
       "log_df": pd.DataFrame(battle_log),
@@ -392,19 +402,9 @@ def simulate_battles(
 
 
 
+
 st.subheader("🏆 Theoretical Max Points (250 Battles / 43-Enemy Reset)")
 
-
-mode = st.radio(
-    "Target Selection Strategy",
-    options=["points", "wins"],
-    format_func=lambda x: (
-        "Maximize Points (Highest Points First)"
-        if x == "points"
-        else "Maximize Wins (Strongest Target First)"
-    ),
-    horizontal=True,
-)
 
 if st.button("Run Theoretical Max Simulation"):
   sim = simulate_battles(
@@ -412,7 +412,6 @@ if st.button("Run Theoretical Max Simulation"):
       enemies_eff,
       attacks_per_player=5,
       reset_threshold=43,
-      optimize_for=mode,
   )
 
   m1, m2, m3 = st.columns(3, wrap=False)
@@ -433,7 +432,6 @@ if st.button("Run Theoretical Max Simulation"):
       players_eff,
       attacks_per_player=5,
       reset_threshold=43,
-      optimize_for=mode,
   )
 
   e1, e2, e3 = st.columns(3, wrap=False)
