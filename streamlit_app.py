@@ -7,7 +7,7 @@ import streamlit as st
 # 1. HELPER FUNCTIONS
 # ==========================================
 
-def increment_visit_counter():
+def increment_visit_counter(plus_one):
   """Increments a visit counter in JSONBin once per Streamlit session."""
   try:
     api_key = st.secrets["JSONBIN_API_KEY"]
@@ -26,7 +26,7 @@ def increment_visit_counter():
     get_resp.raise_for_status()
     record = get_resp.json().get("record", {})
     current_count = int(record.get("visits", 0))
-    new_count = current_count + 1
+    new_count = current_count + plus_one
 
     put_resp = requests.put(
         url,
@@ -338,12 +338,12 @@ is_ignored_visitor = bool(ignore_key) and st.query_params.get("key") == ignore_k
 if "active" not in st.session_state:
   st.session_state.active = True
   if not is_ignored_visitor:
-    st.session_state.visit_count = increment_visit_counter()
+    st.session_state.visit_count = increment_visit_counter(1)
   else:
-    st.session_state.visit_count = None
+    st.session_state.visit_count = increment_visit_counter(0)
 
 if is_ignored_visitor:
-  st.caption("🔧 Creator mode active")
+  st.caption(f"🔧 Creator mode active \n\nUsers so far: {st.session_state.visit_count}")
 
 st.title("Day 6 PvP planner")
 
