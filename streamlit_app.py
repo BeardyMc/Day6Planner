@@ -5,7 +5,7 @@ import streamlit as st
 
 st.title("Day 6 PvP planner")
 
-st.write("Below are all player's powers, if you notice any power discrepancies vs in game data, you can edit it here, but please tell Beardy so that he can edit it for all of us.")
+st.write("Below are all player's powers, if you notice any power discrepancies vs in game data, you can edit it here, but please tell Beardy so that he can edit it for everyone.")
 
 PLAYERS_DATA = [
     {"Points": 50, "Player Name": "Mypleasure", "Power (b)": 17000},
@@ -279,7 +279,7 @@ if "players_df" in st.session_state and "enemies_df" in st.session_state:
   selected_player = st.selectbox("Who are you?", options=clan_names)
 
   safety_margin_pct = st.slider(
-    "Target Safety Margin (% of Attacker Effective Power)",
+    "Target Safety Margin (% of Attacker Effective Power) \n\n(aka how good is your build vs theirs):",
     min_value=50.0,
     max_value=150.0,
     value=90.0,
