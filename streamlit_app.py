@@ -192,6 +192,76 @@ def simulate_battles(
       "log_df": pd.DataFrame(battle_log),
   }
 
+def build_cycle_summary_tables(log_df, defenders_df, attackers_df):
+  """Builds two summary tables from a simulation `log_df`:
+
+  1. `enemy_cycles_df`: For each defender ("Enemy"), shows which attacker
+     ("Attacker") beats them in each Cycle (`Cycle 1`, `Cycle 2`, ...).
+  2. `attacker_targets_df`: For each attacker ("Attacker"), lists their
+     assigned defenders formatted as `"Defender (Cycle X)"`.
+  """
+  defender_names = (
+      defenders_df["Player Name"].dropna().tolist()
+      if defenders_df is not None and not defenders_df.empty
+      else []
+  )
+  attacker_names = (
+      attackers_df["Player Name"].dropna().tolist()
+      if attackers_df is not None and not attackers_df.empty
+      else []
+  )
+
+  if log_df is None or log_df.empty:
+    empty_enemies = pd.DataFrame({"Defender": defender_names})
+    empty_attackers = pd.DataFrame({
+        "Attacker": attacker_names,
+        "Assigned Defenders": ["" for _ in attacker_names],
+    })
+    return empty_enemies, empty_attackers
+
+  # Preserve appearance order of cycles and names
+  cycles = sorted(log_df["Cycle"].dropna().unique().tolist())
+  cycle_cols = [f"Cycle {int(c)}" for c in cycles]
+
+  all_defenders = list(dict.fromkeys(defender_names + log_df["Defender"].dropna().tolist()))
+  enemy_rows = {d: {col: "" for col in cycle_cols} for d in all_defenders}
+
+  all_attackers = list(dict.fromkeys(attacker_names + log_df["Attacker"].dropna().tolist()))
+  attacker_entries = {a: [] for a in all_attackers}
+
+  for _, row in log_df.iterrows():
+    cyc = int(row["Cycle"])
+    cyc_col = f"Cycle {cyc}"
+    att = row["Attacker"]
+    dfnd = row["Defender"]
+
+    # Table 1: Who beats each defender in each cycle
+    if dfnd in enemy_rows:
+      if enemy_rows[dfnd][cyc_col]:
+        enemy_rows[dfnd][cyc_col] = f"{enemy_rows[dfnd][cyc_col]}, {att}"
+      else:
+        enemy_rows[dfnd][cyc_col] = att
+
+    # Table 2: Who each attacker is up against, formatted as "Defender (Cycle)"
+    if att in attacker_entries:
+      attacker_entries[att].append(f"{dfnd} (Cycle {cyc})")
+
+  enemy_records = [{"Defender": d, **enemy_rows[d]} for d in all_defenders]
+  enemy_cycles_df = pd.DataFrame(enemy_records)
+
+  attacker_records = [
+      {
+          "Attacker": a,
+          "Attacks Used": len(attacker_entries[a]),
+          "Assigned Defenders": ", ".join(attacker_entries[a]),
+      }
+      for a in all_attackers
+  ]
+  attacker_targets_df = pd.DataFrame(attacker_records)
+
+  return enemy_cycles_df, attacker_targets_df
+
+
 
 # ==========================================
 # 2. DATA & UI DISPLAY
@@ -501,3 +571,17 @@ if st.button("Run Theoretical Max Simulation"):
     st.dataframe(sim_enemy["log_df"], hide_index=True, use_container_width=True)
   else:
     st.success("Enemies can't beat any of our players with current stats!")
+
+  if not sim["log_df"].empty:
+    st.dataframe(sim["log_df"], hide_index=True, use_container_width=True)
+
+    enemy_cycles_df, our_targets_df = build_cycle_summary_tables(
+        sim["log_df"], enemies_eff, players_eff
+    )
+
+    st.markdown("#### Who should target each Enemy by Cycle")
+    st.dataframe(enemy_cycles_df, hide_index=True, use_container_width=True)
+
+    st.markdown("#### Our Players' Assigned Enemies")
+    st.dataframe(our_targets_df, hide_index=True, use_container_width=True)
+
