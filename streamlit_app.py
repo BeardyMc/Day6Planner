@@ -259,15 +259,7 @@ def format_si_3sf(value):
   formatted_num = f"{sf_scaled:.3g}"
   return f"{sign}{formatted_num}{suffix}"
 
-safety_margin_pct = st.slider(
-    "Target Safety Margin (% of Attacker Effective Power)",
-    min_value=75.0,
-    max_value=100.0,
-    value=90.0,
-    step=1.0,
-    key="safety_margin_pct",
-)
-safety_margin = (safety_margin_pct if safety_margin_pct is not None else 100.0) / 100.0
+
 
 
 
@@ -285,6 +277,16 @@ if "players_df" in st.session_state and "enemies_df" in st.session_state:
 
   clan_names = players_eff["Player Name"].dropna().tolist()
   selected_player = st.selectbox("Who are you?", options=clan_names)
+
+  safety_margin_pct = st.slider(
+    "Target Safety Margin (% of Attacker Effective Power)",
+    min_value=75.0,
+    max_value=100.0,
+    value=90.0,
+    step=1.0,
+    key="safety_margin_pct",
+  )
+  safety_margin = (safety_margin_pct if safety_margin_pct is not None else 100.0) / 100.0
 
   if selected_player:
     player_row = players_eff[players_eff["Player Name"] == selected_player].iloc[
