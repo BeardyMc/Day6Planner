@@ -132,6 +132,13 @@ def format_si_3sf(value):
   return f"{sign}{formatted_num}{suffix}"
 
 
+def sum_roster_power(df, power_col="Power (b)"):
+  """Sums numeric power values safely, ignoring blank or non-numeric cells."""
+  if df is None or df.empty or power_col not in df.columns:
+    return 0.0
+  return float(pd.to_numeric(df[power_col], errors="coerce").fillna(0.0).sum())
+
+
 def format_df_powers(df, power_cols=("Power (b)", "Effective Power")):
   """Returns a copy of `df` with specified power columns formatted via `format_si_3sf`."""
   if df is None or df.empty:
@@ -590,7 +597,8 @@ DISPLAY_COLS = ["Rank", "Player Name", "Power (b)"]
 left_col, right_col = st.columns(2, wrap=False)
 
 with left_col:
-  st.subheader("Players")
+  our_total_power = format_si_3sf(sum_roster_power(st.session_state.players_df))
+  st.subheader(f"EDGR: {our_total_power}")
   edited_players = st.data_editor(
       st.session_state.players_df,
       column_order=DISPLAY_COLS,
@@ -601,6 +609,8 @@ with left_col:
   st.session_state.players_df = edited_players
 
 with right_col:
+  enemy_total_power = format_si_3sf(sum_roster_power(st.session_state.enemies_df))
+  st.subheader(f"Enemies: {enemy_total_power}") 
   st.subheader("Enemies")
   edited_enemies = st.data_editor(
       st.session_state.enemies_df,
