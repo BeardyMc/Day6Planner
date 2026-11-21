@@ -375,18 +375,23 @@ if is_ignored_visitor:
   st.caption(f"🔧 Creator mode active\n\nUsers so far: {count_display}")
 
   with st.expander("Creator Counter Controls", expanded=False):
-    col_val, col_btn, col_rst= st.columns([2, 1, 1], wrap=False)
+    col_val, col_btn, col_rst = st.columns(
+      [1.5, 1, 1],
+      vertical_alignment="bottom",
+      wrap=False,
+    )
     with col_val:
       override_val = st.number_input(
-          "Set Visit Counter To",
-          min_value=0,
-          value=int(st.session_state.visit_count or 0),
-          step=1,
-          key="override_visit_count_input",
+        "Set Visit Counter To",
+        min_value=0,
+        value=int(st.session_state.visit_count or 0),
+        step=1,
+        key="override_visit_count_input",
       )
     with col_btn:
-      st.write("")  # vertical spacing alignment
-      if st.button("Apply Count", key="apply_visit_count_btn"):
+      if st.button(
+        "Apply Count", key="apply_visit_count_btn", width="stretch"
+      ):
         updated = set_visit_count(override_val)
         if updated is not None:
           st.session_state.visit_count = updated
@@ -394,15 +399,15 @@ if is_ignored_visitor:
         else:
           st.error("Failed to update counter in JSONBin.")
     with col_rst:
-      st.write("")
-      if st.button("Reset to 0", key="reset_visit_count_btn"):
-          updated = set_visit_count(0)
-          if updated is not None:
-            st.session_state.visit_count = updated
-            st.rerun()
-          else:
-            st.error("Failed to reset counter in JSONBin.")
-
+      if st.button(
+        "Reset to 0", key="reset_visit_count_btn", width="stretch"
+      ):
+        updated = set_visit_count(0)
+        if updated is not None:
+          st.session_state.visit_count = updated
+          st.rerun()
+        else:
+          st.error("Failed to reset counter in JSONBin.")
 
 
 st.title("Day 6 PvP planner")
