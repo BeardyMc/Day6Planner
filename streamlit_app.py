@@ -280,13 +280,13 @@ if "players_df" in st.session_state and "enemies_df" in st.session_state:
 
   safety_margin_pct = st.slider(
     "Target Safety Margin (% of Attacker Effective Power) \n\n(aka how good is your build vs theirs):",
-    min_value=50.0,
-    max_value=150.0,
-    value=90.0,
-    step=1.0,
+    min_value=50,
+    max_value=150,
+    value=90,
+    step=1,
     key="safety_margin_pct",
   )
-  safety_margin = (safety_margin_pct if safety_margin_pct is not None else 100.0) / 100.0
+  safety_margin = float((safety_margin_pct if safety_margin_pct is not None else 100.0) / 100.0
 
   if selected_player:
     player_row = players_eff[players_eff["Player Name"] == selected_player].iloc[
