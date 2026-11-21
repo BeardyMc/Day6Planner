@@ -394,6 +394,7 @@ if is_ignored_visitor:
         else:
           st.error("Failed to update counter in JSONBin.")
     with col_rst:
+      st.write("")
       if st.button("Reset to 0", key="reset_visit_count_btn"):
           updated = set_visit_count(0)
           if updated is not None:
