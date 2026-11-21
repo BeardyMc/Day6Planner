@@ -263,11 +263,7 @@ ENEMY_DATA = [
     {"Points": 48, "Player Name": "AlphaR", "Power (b)": 463000.0},
     {"Points": 47, "Player Name": "imnotjul", "Power (b)": 6050.0},
     {"Points": 46, "Player Name": "TimeTime", "Power (b)": 3130.0},
-    {
-        "Points": 45,
-        "Player Name": "RoughPhlox43211",
-        "Power (b)": 2760.0,
-    },
+    {"Points": 45, "Player Name": "RoughPhlox43211", "Power (b)": 2760.0},
     {"Points": 44, "Player Name": "FizzMercs", "Power (b)": 2600.0},
     {"Points": 43, "Player Name": "Freaky23", "Power (b)": 2470.0},
     #   {"Points": 42, "Player Name": "DizzyEagle22824", "Power (b)": 2390.0},
@@ -334,12 +330,12 @@ with left_col:
       key="players_editor",
   )
   st.session_state.players_df = edited_players
-  st.caption("Formatted Powers Preview:")
-  st.dataframe(
-      format_df_powers(st.session_state.players_df[DISPLAY_COLS]),
-      hide_index=True,
-      use_container_width=True,
-  )
+#  st.caption("Formatted Powers Preview:")
+#  st.dataframe(
+#      format_df_powers(st.session_state.players_df[DISPLAY_COLS]),
+#      hide_index=True,
+#      use_container_width=True,
+#  )
 
 with right_col:
   st.subheader("Enemies")
@@ -351,12 +347,12 @@ with right_col:
       key="enemies_editor",
   )
   st.session_state.enemies_df = edited_enemies
-  st.caption("Formatted Powers Preview:")
-  st.dataframe(
-      format_df_powers(st.session_state.enemies_df[DISPLAY_COLS]),
-      hide_index=True,
-      use_container_width=True,
-  )
+#  st.caption("Formatted Powers Preview:")
+#  st.dataframe(
+#      format_df_powers(st.session_state.enemies_df[DISPLAY_COLS]),
+#      hide_index=True,
+#      use_container_width=True,
+#  )
 
 ## BRAWL TECH
 col1, col2 = st.columns(2, wrap=False)
@@ -376,7 +372,7 @@ with col1:
         "Our Health Lvl",
         min_value=0,
         max_value=100,
-        value=100,
+        value=73,
         step=1,
         key="our_health_lvl",
     )
