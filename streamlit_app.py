@@ -7,40 +7,58 @@ import streamlit as st
 # 1. HELPER FUNCTIONS
 # ==========================================
 
-def increment_visit_counter(plus_one):
-  """Increments a visit counter in JSONBin once per Streamlit session."""
+def _get_jsonbin_config():
+  """Returns `(url, headers)` from `st.secrets`, or `(None, None)` if missing."""
   try:
     api_key = st.secrets["JSONBIN_API_KEY"]
     bin_id = st.secrets["BIN_ID"]
   except (KeyError, FileNotFoundError):
-    return None
+    return None, None
 
   url = f"https://api.jsonbin.io/v3/b/{bin_id}"
   headers = {
       "X-Master-Key": api_key,
       "Content-Type": "application/json",
   }
+  return url, headers
+
+
+def get_visit_count():
+  """Fetches the current visit count from JSONBin without modifying it."""
+  url, headers = _get_jsonbin_config()
+  if not url:
+    return None
 
   try:
-    get_resp = requests.get(url, headers={"X-Master-Key": api_key}, timeout=5)
-    get_resp.raise_for_status()
-    record = get_resp.json().get("record", {})
-    current_count = int(record.get("visits", 0))
-    new_count = current_count + plus_one
-
-    if plus_one != 0:
-      put_resp = requests.put(
-          url,
-          headers=headers,
-          json={"visits": new_count},
-          timeout=5,
-      )
-      put_resp.raise_for_status()
-
-    return new_count
+    resp = requests.get(url, headers={"X-Master-Key": headers["X-Master-Key"]}, timeout=5)
+    resp.raise_for_status()
+    record = resp.json().get("record", {})
+    return int(record.get("visits", 0))
   except Exception as exc:
-    print(f"JSONBin visit counter error: {exc}", flush=True)
+    print(f"JSONBin get visit count error: {exc}", flush=True)
     return None
+
+
+def set_visit_count(new_value):
+  """Writes an exact `visits` count to JSONBin and returns `new_value` on success."""
+  url, headers = _get_jsonbin_config()
+  if not url:
+    return None
+
+  try:
+    clean_value = max(0, int(new_value))
+    resp = requests.put(
+        url,
+        headers=headers,
+        json={"visits": clean_value},
+        timeout=5,
+    )
+    resp.raise_for_status()
+    return clean_value
+  except Exception as exc:
+    print(f"JSONBin set visit count error: {exc}", flush=True)
+    return None
+ 
 
 
 def calc_effective_power(df, damage_lvl, health_lvl):
@@ -340,9 +358,13 @@ is_ignored_visitor = bool(ignore_key) and st.query_params.get("key") == ignore_k
 
 if "active" not in st.session_state:
   st.session_state.active = True
-  st.session_state.visit_count = increment_visit_counter(
-      0 if is_ignored_visitor else 1
-  )
+  current_visits = get_visit_count()
+  if is_ignored_visitor:
+    st.session_state.visit_count = current_visits
+  elif current_visits is not None:
+    st.session_state.visit_count = set_visit_count(current_visits + 1)
+  else:
+    st.session_state.visit_count = None
 
 if is_ignored_visitor:
   count_display = (
@@ -351,6 +373,35 @@ if is_ignored_visitor:
       else "Unavailable"
   )
   st.caption(f"🔧 Creator mode active\n\nUsers so far: {count_display}")
+
+  with st.expander("Creator Counter Controls", expanded=False):
+    col_val, col_btn = st.columns([2, 1])
+    with col_val:
+      override_val = st.number_input(
+          "Set Visit Counter To",
+          min_value=0,
+          value=int(st.session_state.visit_count or 0),
+          step=1,
+          key="override_visit_count_input",
+      )
+    with col_btn:
+      st.write("")  # vertical spacing alignment
+      if st.button("Apply Count", key="apply_visit_count_btn"):
+        updated = set_visit_count(override_val)
+        if updated is not None:
+          st.session_state.visit_count = updated
+          st.rerun()
+        else:
+          st.error("Failed to update counter in JSONBin.")
+
+    if st.button("Reset to 0", key="reset_visit_count_btn"):
+      updated = set_visit_count(0)
+      if updated is not None:
+        st.session_state.visit_count = updated
+        st.rerun()
+      else:
+        st.error("Failed to reset counter in JSONBin.")
+
 
 
 st.title("Day 6 PvP planner")
