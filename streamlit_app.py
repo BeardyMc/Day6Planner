@@ -457,10 +457,64 @@ def _filter_active_entries(entries):
   ]
 
 
+def sort_roster_for_save(df, power_col="Power (b)"):
+  """Sorts a roster DataFrame by rank tier (Leader -> Commander -> Captain -> r1..r5),
+
+  then highest power descending, and finally Player Name ascending.
+  """
+  if df is None or df.empty:
+    return pd.DataFrame() if df is None else df.copy()
+
+  out = df.dropna(how="all").copy()
+  if out.empty:
+    return out
+
+  rank_series = (
+      out.get("Rank", pd.Series(["r4"] * len(out), index=out.index))
+      .fillna("r4")
+      .astype(str)
+      .str.strip()
+      .str.lower()
+  )
+  power_series = pd.to_numeric(
+      out.get(power_col, pd.Series([0.0] * len(out), index=out.index)),
+      errors="coerce",
+  ).fillna(0.0)
+  name_series = (
+      out.get("Player Name", pd.Series([""] * len(out), index=out.index))
+      .fillna("")
+      .astype(str)
+      .str.strip()
+  )
+
+  rank_priority = {
+      "leader": 0,
+      "commander": 1,
+      "captain": 2,
+      "r1": 3,
+      "r2": 4,
+      "r3": 5,
+      "r4": 6,
+      "r5": 7,
+  }
+
+  out["_rank_ord"] = rank_series.map(rank_priority).fillna(99)
+  out["_power_neg"] = -power_series
+  out["_name_key"] = name_series.str.lower()
+
+  out = out.sort_values(
+      by=["_rank_ord", "_power_neg", "_name_key"],
+      ascending=[True, True, True],
+      kind="mergesort",
+  ).drop(columns=["_rank_ord", "_power_neg", "_name_key"])
+
+  return out.reset_index(drop=True)
+
+
 def save_rosters_to_github(
     players_df, enemies_df, commit_message="Update PvP rosters"
 ):
-  """Pushes `players_df` and `enemies_df` to the GitHub JSON file."""
+  """Sorts and pushes `players_df` and `enemies_df` to the GitHub JSON file."""
   token, repo, path, branch = _get_github_config()
   if not token or not repo:
     return False, "Missing GITHUB_TOKEN or GITHUB_REPO in secrets."
@@ -479,20 +533,12 @@ def save_rosters_to_github(
     get_resp.raise_for_status()
     current_sha = get_resp.json()["sha"]
 
-    clean_players = (
-        players_df.dropna(how="all")
-        if players_df is not None
-        else pd.DataFrame()
-    )
-    clean_enemies = (
-        enemies_df.dropna(how="all")
-        if enemies_df is not None
-        else pd.DataFrame()
-    )
+    sorted_players = sort_roster_for_save(players_df)
+    sorted_enemies = sort_roster_for_save(enemies_df)
 
     roster_payload = {
-        "players": clean_players.to_dict(orient="records"),
-        "enemies": clean_enemies.to_dict(orient="records"),
+        "players": sorted_players.to_dict(orient="records"),
+        "enemies": sorted_enemies.to_dict(orient="records"),
     }
     encoded_content = base64.b64encode(
         json.dumps(roster_payload, indent=2).encode("utf-8")
@@ -506,10 +552,17 @@ def save_rosters_to_github(
     }
     put_resp = requests.put(url, headers=headers, json=put_body, timeout=10)
     put_resp.raise_for_status()
-    return True, f"Pushed rosters to `{path}` on `{branch}`."
+
+    # Keep session tables aligned with the newly saved sort order
+    st.session_state.players_df = sorted_players
+    st.session_state.enemies_df = sorted_enemies
+
+    return True, f"Pushed sorted rosters to `{path}` on `{branch}`."
   except Exception as exc:
     print(f"GitHub push error: {exc}", flush=True)
     return False, f"GitHub push failed: {exc}"
+
+  
 
 
 
