@@ -280,7 +280,7 @@ if "players_df" in st.session_state and "enemies_df" in st.session_state:
 
   safety_margin_pct = st.slider(
     "Target Safety Margin (% of Attacker Effective Power)",
-    min_value=75.0,
+    min_value=60.0,
     max_value=100.0,
     value=90.0,
     step=1.0,
