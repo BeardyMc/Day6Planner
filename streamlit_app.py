@@ -259,6 +259,18 @@ def format_si_3sf(value):
   formatted_num = f"{sf_scaled:.3g}"
   return f"{sign}{formatted_num}{suffix}"
 
+safety_margin_pct = st.number_input(
+    "Target Safety Margin (% of Attacker Effective Power)",
+    min_value=0.0,
+    max_value=100.0,
+    value=90.0,
+    step=1.0,
+    key="safety_margin_pct",
+)
+safety_margin = (safety_margin_pct if safety_margin_pct is not None else 100.0) / 100.0
+
+
+
 
 # nested in an if in case user breaks data in editable boxes. 
 if "players_df" in st.session_state and "enemies_df" in st.session_state:
@@ -279,14 +291,17 @@ if "players_df" in st.session_state and "enemies_df" in st.session_state:
         0
     ]
     my_eff_power = float(player_row["Effective Power"])
+    max_target_power = my_eff_power * safety_margin
+
 
     st.metric(
         label=f"{selected_player}'s Effective Power",
         value=format_si_3sf(my_eff_power),
+        delta=f"Safe target cap: {format_si_3sf(max_target_power)} ({safety_margin_pct:.0f}%)",
+        delta_color="off",
     )
 
-
-    winnable_enemies = enemies_eff[enemies_eff["Effective Power"] <= my_eff_power]
+    winnable_enemies = enemies_eff[enemies_eff["Effective Power"] <= (my_eff_power * safety_margin)]
 
     st.write(f"**Battleable Enemies ({len(winnable_enemies)}):**")
     st.dataframe(
@@ -300,6 +315,7 @@ def simulate_battles(
     defenders_df,
     attacks_per_player=5,
     reset_threshold=43,
+    safety_margin=1.0,
 ):
   """Maximizes total points across reset cycles.
 
@@ -344,7 +360,7 @@ def simulate_battles(
 
       # Find all attackers who still have attacks left AND can beat this defender
       eligible = attackers[
-          (attackers["attacks_left"] > 0) & (attackers["eff_power"] >= d_power)
+          (attackers["attacks_left"] > 0) & ((attackers["eff_power"] * safety_margin) >= d_power)
       ]
 
       if eligible.empty:
@@ -412,6 +428,7 @@ if st.button("Run Theoretical Max Simulation"):
       enemies_eff,
       attacks_per_player=5,
       reset_threshold=43,
+      safety_margin=safety_margin
   )
 
   m1, m2, m3 = st.columns(3, wrap=False)
@@ -432,6 +449,7 @@ if st.button("Run Theoretical Max Simulation"):
       players_eff,
       attacks_per_player=5,
       reset_threshold=43,
+      safety_margin=1.1
   )
 
   e1, e2, e3 = st.columns(3, wrap=False)
