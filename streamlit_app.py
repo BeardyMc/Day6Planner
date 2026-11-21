@@ -636,7 +636,7 @@ with st.expander("Save / Push Rosters to GitHub", expanded=False):
     )
     commit_msg_input = st.text_input(
         "Commit Message",
-        placeholder="e.g. Updated PlayerOne93 power to 220t for Day 6",
+        placeholder="e.g. Updated [my name]'s power",
         key="roster_commit_msg_input",
     )
     final_commit_msg = (
