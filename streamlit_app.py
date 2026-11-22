@@ -749,7 +749,7 @@ with col1:
         step=1,
         key="our_health_lvl",
     )
-    our_points_multiplier = st.number_input(
+    our_points_multiplier = st.slider(
         "Our Points Multiplier",
         min_value=0,
         max_value=40,
@@ -775,7 +775,7 @@ with col2:
         step=1,
         key="enemy_health_lvl",
     )
-    enemy_points_multiplier = st.number_input(
+    enemy_points_multiplier = st.slider(
         "Enemy Points Multiplier",
         min_value=0,
         max_value=40,
