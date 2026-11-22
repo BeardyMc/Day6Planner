@@ -157,6 +157,7 @@ def simulate_battles(
     attacks_per_player=5,
     reset_threshold=43,
     safety_margin=1.0,
+    points_multiplier=1.0,
 ):
   """Maximizes total points across reset cycles.
 
@@ -214,12 +215,13 @@ def simulate_battles(
       a_row = attackers.loc[chosen_idx]
 
       attackers.at[chosen_idx, "attacks_left"] -= 1
+      gained_points = round(d_pts * points_multiplier) 
       cycle_matches.append({
           "attacker_name": a_row["Player Name"],
           "attacker_power": a_row["eff_power"],
           "defender_name": d_row["Player Name"],
           "defender_power": d_power,
-          "points": d_pts,
+          "points": gained_points,
       })
 
     # If zero matches could be made in this cycle, no valid battles remain anywhere
