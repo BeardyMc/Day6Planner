@@ -866,7 +866,7 @@ if st.button("Run Theoretical Max Simulation"):
       attacks_per_player=5,
       reset_threshold=43,
       safety_margin=safety_margin,
-      1+our_points_multiplier/100
+      1+our_points_multiplier/100, 
   )
 
   m1, m2, m3 = st.columns(3, wrap=False)
@@ -888,7 +888,7 @@ if st.button("Run Theoretical Max Simulation"):
       attacks_per_player=5,
       reset_threshold=43,
       safety_margin=(1 / safety_margin),
-      1+enemy_points_multiplier
+      1+enemy_points_multiplier, 
   )
 
   e1, e2, e3 = st.columns(3, wrap=False)
