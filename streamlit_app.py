@@ -1439,7 +1439,7 @@ else:
 
   st.subheader("📡 Record Battle Result & Manage Log")
   with st.expander("Record a Battle Result", expanded=True):
-    r_c1, r_c2, r_c3, r_c4, r_c5 = st.columns([1.2, 2, 1.3, 2, 1.3])
+    r_c1, r_c2 = st.columns(2, wrap=False)
     with r_c1:
       att_side = st.selectbox(
           "Attacker Side", ["EDGR", "EX"], key="live_att_side"
@@ -1460,24 +1460,20 @@ else:
     ):
       st.session_state["live_att_player"] = att_options[0]
 
-    with r_c2:
       att_player = st.selectbox(
           "Attacker", options=att_options, key="live_att_player"
       )
-    with r_c3:
+    with r_c2:
       outcome_choice = st.selectbox(
           "Attacker Result", ["Won", "Lost"], key="live_att_outcome"
       )
-    with r_c4:
+
       dfnd_options = enemy_names if att_side == "EDGR" else clan_names
       dfnd_player = st.selectbox(
           "Defender", options=dfnd_options, key="live_dfnd_player"
       )
-    with r_c5:
-      dfnd_side = "EX" if att_side == "EDGR" else "EDGR"
-      st.text_input(
-          "Defender Side", value=dfnd_side, disabled=True, key="live_dfnd_side"
-      )
+    
+    dfnd_side = "EX" if att_side == "EDGR" else "EDGR"
 
     if st.button("Log Battle", key="log_battle_btn"):
       if att_player and dfnd_player:
