@@ -776,7 +776,7 @@ with col2:
         key="enemy_health_lvl",
     )
     enemy_points_multiplier = st.number_input(
-        "Our Points Multiplier",
+        "Enemy Points Multiplier",
         min_value=0,
         max_value=40,
         value=40,
