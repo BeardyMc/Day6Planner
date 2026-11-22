@@ -1459,7 +1459,7 @@ else:
         and att_options
     ):
       st.session_state["live_att_player"] = att_options[0]
-
+    with r_c1:
       att_player = st.selectbox(
           "Attacker", options=att_options, key="live_att_player"
       )
