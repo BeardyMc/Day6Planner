@@ -2,7 +2,6 @@ import base64
 import json
 import math
 from pathlib import Path
-import re
 import pandas as pd
 import requests
 import streamlit as st
@@ -70,8 +69,9 @@ def set_visit_count(new_value):
 def calc_effective_power(df, damage_lvl, health_lvl):
   """Computes Effective Power = Power (b) * (1 + (damage + health) / 2)."""
   if df is None or df.empty:
-    out = pd.DataFrame(columns=["Rank", "Player Name", "Power (b)", "Effective Power"])
-    return out
+    return pd.DataFrame(
+        columns=["Rank", "Player Name", "Power (b)", "Effective Power"]
+    )
   out = df.copy()
   dmg = damage_lvl or 0
   hp = health_lvl or 0
@@ -140,6 +140,11 @@ def format_df_powers(df, power_cols=("Power (b)", "Effective Power")):
     if col in out.columns:
       out[col] = out[col].apply(format_si_3sf)
   return out
+
+
+def get_reset_threshold(enemy_count, buffer=5):
+  """Returns defeats needed for a full reset (`total_enemies - 5`, min 1)."""
+  return max(1, int(enemy_count) - int(buffer))
 
 
 def simulate_battles(
@@ -604,7 +609,6 @@ def save_battles_to_github(battles_df, commit_message="Update PvP battles"):
         json.dumps(payload_obj, indent=2).encode("utf-8")
     ).decode("utf-8")
 
-    # Fetch existing SHA if file already exists in repo
     sha = None
     get_resp = requests.get(
         url, headers=headers, params={"ref": branch}, timeout=10
@@ -628,8 +632,10 @@ def save_battles_to_github(battles_df, commit_message="Update PvP battles"):
     return False, f"GitHub battles push failed: {exc}"
 
 
-def build_battle_record(attacker_side, attacker, defender_side, defender, attacker_won):
-  """Builds a normalized battle record containing explicit attacker, defender, winner, and loser."""
+def build_battle_record(
+    attacker_side, attacker, defender_side, defender, attacker_won
+):
+  """Builds a normalized battle record with explicit attacker, defender, winner, and loser."""
   if attacker_won:
     winner_side, winner = attacker_side, attacker
     loser_side, loser = defender_side, defender
@@ -647,60 +653,6 @@ def build_battle_record(attacker_side, attacker, defender_side, defender, attack
       "loser_side": loser_side,
       "loser": loser,
   }
-
-
-def parse_battle_log_lines(raw_text, players_df, enemies_df):
-  """Parses lines like `[EDGR] ILM defeated [EX] Vincee` or `[EDGR] Degs224 failed to defeat [EX] Jdong`."""
-  if not raw_text or not raw_text.strip():
-    return []
-
-  player_lookup = {
-      str(n).strip().lower(): str(n).strip()
-      for n in players_df.get("Player Name", pd.Series(dtype=str)).dropna()
-      if str(n).strip()
-  }
-  enemy_lookup = {
-      str(n).strip().lower(): str(n).strip()
-      for n in enemies_df.get("Player Name", pd.Series(dtype=str)).dropna()
-      if str(n).strip()
-  }
-
-  pattern = re.compile(
-      r"^(?:\[(?:EDGR|EX)\]\s*)?(.+?)\s+(defeated|failed to defeat)\s+(?:\[(?:EDGR|EX)\]\s*)?(.+?)$",
-      re.IGNORECASE,
-  )
-
-  parsed = []
-  for line in raw_text.splitlines():
-    cleaned = line.strip()
-    if not cleaned:
-      continue
-    m = pattern.match(cleaned)
-    if not m:
-      continue
-
-    att_raw, verb, dfnd_raw = (
-        m.group(1).strip(),
-        m.group(2).lower(),
-        m.group(3).strip(),
-    )
-    attacker_won = verb == "defeated"
-
-    att_key, dfnd_key = att_raw.lower(), dfnd_raw.lower()
-    if att_key in player_lookup and dfnd_key in enemy_lookup:
-      att_side, dfnd_side = "EDGR", "EX"
-      att_name, dfnd_name = player_lookup[att_key], enemy_lookup[dfnd_key]
-    elif att_key in enemy_lookup and dfnd_key in player_lookup:
-      att_side, dfnd_side = "EX", "EDGR"
-      att_name, dfnd_name = enemy_lookup[att_key], player_lookup[dfnd_key]
-    else:
-      continue
-
-    parsed.append(
-        build_battle_record(att_side, att_name, dfnd_side, dfnd_name, attacker_won)
-    )
-
-  return parsed
 
 
 def get_remaining_attacks_by_side(
@@ -730,6 +682,50 @@ def get_remaining_attacks_by_side(
   edgr_rem = {k: max(0, attacks_per_player - v) for k, v in edgr_used.items()}
   ex_rem = {k: max(0, attacks_per_player - v) for k, v in ex_used.items()}
   return edgr_rem, ex_rem
+
+
+def get_live_war_progress(
+    battles_df, total_players, total_enemies, attacks_per_player=5
+):
+  """Computes remaining EDGR battles, cycle defeats, and enemies defeated this cycle."""
+  reset_threshold = get_reset_threshold(total_enemies)
+  max_battles = int(total_players) * int(attacks_per_player)
+
+  edgr_attacks_used = 0
+  edgr_win_targets = []
+
+  if battles_df is not None and not battles_df.empty:
+    for _, row in battles_df.iterrows():
+      att_side = str(row.get("attacker_side", "")).strip().upper()
+      win_side = str(row.get("winner_side", "")).strip().upper()
+      loser_name = str(row.get("loser", "")).strip()
+
+      if att_side == "EDGR":
+        edgr_attacks_used += 1
+      if win_side == "EDGR":
+        edgr_win_targets.append(loser_name)
+
+  edgr_wins = len(edgr_win_targets)
+  remaining_battles = max(0, max_battles - edgr_attacks_used)
+  wins_in_current_cycle = edgr_wins % reset_threshold
+  defeats_left_to_reset = reset_threshold - wins_in_current_cycle
+
+  defeated_this_cycle = (
+      edgr_win_targets[-wins_in_current_cycle:]
+      if wins_in_current_cycle > 0
+      else []
+  )
+
+  return {
+      "reset_threshold": reset_threshold,
+      "max_battles": max_battles,
+      "edgr_attacks_used": edgr_attacks_used,
+      "remaining_battles": remaining_battles,
+      "edgr_wins": edgr_wins,
+      "wins_in_current_cycle": wins_in_current_cycle,
+      "defeats_left_to_reset": defeats_left_to_reset,
+      "defeated_this_cycle": defeated_this_cycle,
+  }
 
 
 def compute_iterative_multipliers(
@@ -853,8 +849,13 @@ def recommend_next_reset_assignments(
     safety_margin=0.9,
     reset_remaining=43,
     points_multiplier=1.4,
+    already_defeated=None,
 ):
-  """Suggests weakest-eligible clan attackers for top remaining targets before reset."""
+  """Suggests weakest-eligible clan attackers for undefeated targets before reset."""
+  defeated_set = {
+      str(x).strip() for x in (already_defeated or []) if str(x).strip()
+  }
+
   atk = players_eff.copy()
   atk["adj_power"] = atk.apply(
       lambda r: float(r["Effective Power"])
@@ -867,6 +868,9 @@ def recommend_next_reset_assignments(
   atk = atk[atk["rem_attacks"] > 0].copy()
 
   dfn = enemies_eff.copy()
+  if defeated_set:
+    dfn = dfn[~dfn["Player Name"].isin(defeated_set)].copy()
+
   dfn["adj_power"] = dfn.apply(
       lambda r: float(r["Effective Power"])
       * float(enemy_mult_map.get(r["Player Name"], 1.0)),
@@ -1148,6 +1152,7 @@ valid_enemies_eff = enemies_eff[
 
 clan_names = valid_players_eff["Player Name"].tolist()
 enemy_names = valid_enemies_eff["Player Name"].tolist()
+reset_threshold = get_reset_threshold(len(valid_enemies_eff))
 
 # ==========================================
 # 4. THEORETICAL MODE vs. RUNNING MODE
@@ -1211,14 +1216,16 @@ if app_mode == "Theoretical Mode":
           use_container_width=True,
       )
 
-  st.subheader("🏆 Theoretical Max Points (250 Battles / 43-Enemy Reset)")
+  st.subheader(
+      f"🏆 Theoretical Max Points (250 Battles / {reset_threshold}-Enemy Reset)"
+  )
 
   if st.button("Run Theoretical Max Simulation", key="run_theo_sim_btn"):
     sim = simulate_battles(
         valid_players_eff,
         valid_enemies_eff,
         attacks_per_player=5,
-        reset_threshold=43,
+        reset_threshold=reset_threshold,
         safety_margin=safety_margin,
         points_multiplier=1 + our_points_multiplier / 100,
     )
@@ -1228,7 +1235,7 @@ if app_mode == "Theoretical Mode":
         "Total Wins", f"{sim['total_wins']} / {sim['max_possible_battles']}"
     )
     m2.metric("Projected Points", f"{sim['total_points']:,.0f}")
-    m3.metric("Full 43-Defeat Resets", sim["cycles_completed"])
+    m3.metric(f"Full {reset_threshold}-Defeat Resets", sim["cycles_completed"])
 
     if not sim["log_df"].empty:
       st.dataframe(sim["log_df"], hide_index=True, use_container_width=True)
@@ -1242,7 +1249,7 @@ if app_mode == "Theoretical Mode":
         valid_enemies_eff,
         valid_players_eff,
         attacks_per_player=5,
-        reset_threshold=43,
+        reset_threshold=reset_threshold,
         safety_margin=(1 / safety_margin),
         points_multiplier=1 + enemy_points_multiplier / 100,
     )
@@ -1253,7 +1260,9 @@ if app_mode == "Theoretical Mode":
         f"{sim_enemy['total_wins']} / {sim_enemy['max_possible_battles']}",
     )
     e2.metric("Points Enemies Could Score", f"{sim_enemy['total_points']:,.0f}")
-    e3.metric("Full 43-Defeat Resets", sim_enemy["cycles_completed"])
+    e3.metric(
+        f"Full {reset_threshold}-Defeat Resets", sim_enemy["cycles_completed"]
+    )
 
     if not sim_enemy["log_df"].empty:
       st.dataframe(sim_enemy["log_df"], hide_index=True, use_container_width=True)
@@ -1282,96 +1291,13 @@ else:
         else pd.DataFrame(columns=BATTLE_COLS)
     )
 
-  st.subheader("📡 Live Battle Log & Dynamic Multipliers")
-
-  with st.expander("Record a Battle Result", expanded=True):
-    r_c1, r_c2, r_c3, r_c4, r_c5 = st.columns([1.2, 2, 1.3, 2, 1.3])
-    with r_c1:
-      att_side = st.selectbox(
-          "Attacker Side", ["EDGR", "EX"], key="live_att_side"
-      )
-    with r_c2:
-      att_options = clan_names if att_side == "EDGR" else enemy_names
-      att_player = st.selectbox(
-          "Attacker", options=att_options, key="live_att_player"
-      )
-    with r_c3:
-      outcome_choice = st.selectbox(
-          "Attacker Result", ["Won", "Lost"], key="live_att_outcome"
-      )
-    with r_c4:
-      dfnd_options = enemy_names if att_side == "EDGR" else clan_names
-      dfnd_player = st.selectbox(
-          "Defender", options=dfnd_options, key="live_dfnd_player"
-      )
-    with r_c5:
-      dfnd_side = "EX" if att_side == "EDGR" else "EDGR"
-      st.text_input(
-          "Defender Side", value=dfnd_side, disabled=True, key="live_dfnd_side"
-      )
-
-    if st.button("Log Battle", key="log_battle_btn"):
-      if att_player and dfnd_player:
-        record = build_battle_record(
-            attacker_side=att_side,
-            attacker=att_player,
-            defender_side=dfnd_side,
-            defender=dfnd_player,
-            attacker_won=(outcome_choice == "Won"),
-        )
-        st.session_state.battles_df = pd.concat(
-            [st.session_state.battles_df, pd.DataFrame([record])],
-            ignore_index=True,
-        )
-        st.rerun()
-
-    paste_lines = st.text_area(
-        "Or paste battle log lines (e.g. `[EDGR] ILM defeated [EX] Vincee`)",
-        height=75,
-        key="live_paste_lines",
-    )
-    if st.button("Import Pasted Lines", key="import_live_lines_btn"):
-      parsed = parse_battle_log_lines(
-          paste_lines, valid_players_eff, valid_enemies_eff
-      )
-      if parsed:
-        st.session_state.battles_df = pd.concat(
-            [st.session_state.battles_df, pd.DataFrame(parsed)],
-            ignore_index=True,
-        )
-        st.success(f"Imported {len(parsed)} battle(s).")
-        st.rerun()
-      else:
-        st.warning("No matching battle lines could be parsed.")
-
-  # Editable battle table so typos can be removed before saving
-  edited_battles = st.data_editor(
+  war_progress = get_live_war_progress(
       st.session_state.battles_df,
-      hide_index=True,
-      num_rows="dynamic",
-      use_container_width=True,
-      key="live_battles_editor",
+      total_players=len(valid_players_eff),
+      total_enemies=len(valid_enemies_eff),
+      attacks_per_player=5,
   )
-  st.session_state.battles_df = edited_battles
-
-  with st.expander("Save Battle Log to GitHub (`data/pvp_battles.json`)", expanded=False):
-    battle_commit_msg = st.text_input(
-        "Battle Log Commit Message",
-        value="Update live PvP battle log",
-        key="battle_commit_msg_input",
-    )
-    if st.button("Push Battles to GitHub", key="push_battles_btn"):
-      ok, msg = save_battles_to_github(
-          st.session_state.battles_df,
-          commit_message=battle_commit_msg.strip() or "Update PvP battle log",
-      )
-      if ok:
-        st.success(msg)
-      else:
-        st.error(msg)
-
-  # Compute dynamic multipliers & remaining battles for both sides
-  edgr_rem_map, ex_rem_map = get_remaining_attacks_by_side(
+  edgr_rem_map, _ = get_remaining_attacks_by_side(
       st.session_state.battles_df,
       clan_names,
       enemy_names,
@@ -1386,9 +1312,17 @@ else:
       )
   )
 
-  if not mult_summary_df.empty:
-    st.markdown("#### Learned Player Multipliers & Adjusted Effective Power")
-    st.dataframe(mult_summary_df, hide_index=True, use_container_width=True)
+  st.subheader("📊 Live War Progress")
+  p1, p2, p3 = st.columns(3, wrap=False)
+  p1.metric(
+      "EDGR Battles Remaining",
+      f"{war_progress['remaining_battles']} / {war_progress['max_battles']}",
+  )
+  p2.metric(
+      "Defeats Left to Reset",
+      f"{war_progress['defeats_left_to_reset']} / {war_progress['reset_threshold']}",
+  )
+  p3.metric("Total EDGR Wins", war_progress["edgr_wins"])
 
   st.subheader("🎯 Personal Matchups & Remaining Battles")
   selected_runner = st.selectbox(
@@ -1424,6 +1358,12 @@ else:
         delta_color="off",
     )
 
+    defeated_set = {
+        str(x).strip()
+        for x in (war_progress.get("defeated_this_cycle") or [])
+        if str(x).strip()
+    }
+
     enemies_scored = valid_enemies_eff.copy()
     enemies_scored["Mult"] = enemies_scored["Player Name"].map(
         lambda n: float(enemy_mult_map.get(n, 1.0))
@@ -1450,11 +1390,23 @@ else:
       display_winnable = winnable_now[
           ["Player Name", "Rank", "Est Points", "Mult", "Adj_Power_Num"]
       ].copy()
+      display_winnable["Status"] = display_winnable["Player Name"].apply(
+          lambda name: "(next cycle)"
+          if str(name).strip() in defeated_set
+          else "Available"
+      )
       display_winnable["Adjusted Eff Power"] = display_winnable[
           "Adj_Power_Num"
       ].apply(format_si_3sf)
       display_winnable = display_winnable[
-          ["Player Name", "Rank", "Est Points", "Mult", "Adjusted Eff Power"]
+          [
+              "Status",
+              "Player Name",
+              "Rank",
+              "Est Points",
+              "Mult",
+              "Adjusted Eff Power",
+          ]
       ]
       st.dataframe(
           display_winnable, hide_index=True, use_container_width=True
@@ -1465,15 +1417,6 @@ else:
       )
 
   st.subheader("🧭 Best Attackers for Remaining Defeats Before Next Reset")
-  defeats_left_in_cycle = st.number_input(
-      "Defeats Remaining Until Next Reset",
-      min_value=1,
-      max_value=43,
-      value=43,
-      step=1,
-      key="defeats_left_in_cycle",
-  )
-
   reset_recs_df = recommend_next_reset_assignments(
       players_eff=valid_players_eff,
       enemies_eff=valid_enemies_eff,
@@ -1481,8 +1424,9 @@ else:
       enemy_mult_map=enemy_mult_map,
       remaining_map=edgr_rem_map,
       safety_margin=run_safety_margin,
-      reset_remaining=int(defeats_left_in_cycle),
+      reset_remaining=war_progress["defeats_left_to_reset"],
       points_multiplier=1.0 + our_points_multiplier / 100.0,
+      already_defeated=war_progress["defeated_this_cycle"],
   )
 
   if not reset_recs_df.empty:
@@ -1492,3 +1436,91 @@ else:
         "No remaining eligible matchups found with current remaining battles and"
         " safety margin."
     )
+
+  st.subheader("📡 Record Battle Result & Manage Log")
+  with st.expander("Record a Battle Result", expanded=True):
+    r_c1, r_c2, r_c3, r_c4, r_c5 = st.columns([1.2, 2, 1.3, 2, 1.3])
+    with r_c1:
+      att_side = st.selectbox(
+          "Attacker Side", ["EDGR", "EX"], key="live_att_side"
+      )
+
+    att_options = clan_names if att_side == "EDGR" else enemy_names
+
+    if (
+        att_side == "EDGR"
+        and selected_runner in att_options
+        and st.session_state.get("_last_synced_runner") != selected_runner
+    ):
+      st.session_state["live_att_player"] = selected_runner
+      st.session_state["_last_synced_runner"] = selected_runner
+    elif (
+        st.session_state.get("live_att_player") not in att_options
+        and att_options
+    ):
+      st.session_state["live_att_player"] = att_options[0]
+
+    with r_c2:
+      att_player = st.selectbox(
+          "Attacker", options=att_options, key="live_att_player"
+      )
+    with r_c3:
+      outcome_choice = st.selectbox(
+          "Attacker Result", ["Won", "Lost"], key="live_att_outcome"
+      )
+    with r_c4:
+      dfnd_options = enemy_names if att_side == "EDGR" else clan_names
+      dfnd_player = st.selectbox(
+          "Defender", options=dfnd_options, key="live_dfnd_player"
+      )
+    with r_c5:
+      dfnd_side = "EX" if att_side == "EDGR" else "EDGR"
+      st.text_input(
+          "Defender Side", value=dfnd_side, disabled=True, key="live_dfnd_side"
+      )
+
+    if st.button("Log Battle", key="log_battle_btn"):
+      if att_player and dfnd_player:
+        record = build_battle_record(
+            attacker_side=att_side,
+            attacker=att_player,
+            defender_side=dfnd_side,
+            defender=dfnd_player,
+            attacker_won=(outcome_choice == "Won"),
+        )
+        st.session_state.battles_df = pd.concat(
+            [st.session_state.battles_df, pd.DataFrame([record])],
+            ignore_index=True,
+        )
+        st.rerun()
+
+  edited_battles = st.data_editor(
+      st.session_state.battles_df,
+      hide_index=True,
+      num_rows="dynamic",
+      use_container_width=True,
+      key="live_battles_editor",
+  )
+  st.session_state.battles_df = edited_battles
+
+  with st.expander(
+      "Save Battle Log to GitHub (`data/pvp_battles.json`)", expanded=False
+  ):
+    battle_commit_msg = st.text_input(
+        "Battle Log Commit Message",
+        value="Update live PvP battle log",
+        key="battle_commit_msg_input",
+    )
+    if st.button("Push Battles to GitHub", key="push_battles_btn"):
+      ok, msg = save_battles_to_github(
+          st.session_state.battles_df,
+          commit_message=battle_commit_msg.strip() or "Update live PvP battle log",
+      )
+      if ok:
+        st.success(msg)
+      else:
+        st.error(msg)
+
+  if not mult_summary_df.empty:
+    st.markdown("#### Learned Player Multipliers & Adjusted Effective Power")
+    st.dataframe(mult_summary_df, hide_index=True, use_container_width=True)
