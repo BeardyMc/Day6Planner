@@ -733,8 +733,6 @@ with st.expander("Save / Push Rosters to GitHub", expanded=False):
 ## BRAWL TECH
 col1, col2 = st.columns(2, wrap=False)
 with col1:
-  col1_1, col1_2 = st.columns(2, wrap=False)
-  with col1_1:
     our_damage_lvl = st.number_input(
         "Our Damage Lvl",
         min_value=0,
@@ -743,35 +741,47 @@ with col1:
         step=1,
         key="our_damage_lvl",
     )
-  with col1_2:
     our_health_lvl = st.number_input(
         "Our Health Lvl",
         min_value=0,
         max_value=100,
-        value=80,
+        value=84,
         step=1,
         key="our_health_lvl",
     )
+    our_points_multiplier = st.number_input(
+        "Our Points Multiplier",
+        min_value=0,
+        max_value=40,
+        value=0,
+        step=4,
+        key="our_points_multiplier",
+    )
 
 with col2:
-  col2_1, col2_2 = st.columns(2, wrap=False)
-  with col2_1:
     enemy_damage_lvl = st.number_input(
         "Enemy Damage Lvl",
         min_value=0,
         max_value=100,
-        value=100,
+        value=74,
         step=1,
         key="enemy_damage_lvl",
     )
-  with col2_2:
     enemy_health_lvl = st.number_input(
         "Enemy Health Lvl",
         min_value=0,
         max_value=100,
-        value=100,
+        value=50,
         step=1,
         key="enemy_health_lvl",
+    )
+    enemy_points_multiplier = st.number_input(
+        "Our Points Multiplier",
+        min_value=0,
+        max_value=40,
+        value=40,
+        step=4,
+        key="enemy_points_multiplier",
     )
 
 players_eff = calc_effective_power(
@@ -856,6 +866,7 @@ if st.button("Run Theoretical Max Simulation"):
       attacks_per_player=5,
       reset_threshold=43,
       safety_margin=safety_margin,
+      1+our_points_multiplier/100
   )
 
   m1, m2, m3 = st.columns(3, wrap=False)
@@ -877,6 +888,7 @@ if st.button("Run Theoretical Max Simulation"):
       attacks_per_player=5,
       reset_threshold=43,
       safety_margin=(1 / safety_margin),
+      1+enemy_points_multiplier
   )
 
   e1, e2, e3 = st.columns(3, wrap=False)
