@@ -1,0 +1,24 @@
+{
+  "battles": [
+    {
+      "attacker_side": "EDGR",
+      "attacker": "ILM",
+      "defender_side": "EX",
+      "defender": "Vincee",
+      "winner_side": "EDGR",
+      "winner": "ILM",
+      "loser_side": "EX",
+      "loser": "Vincee"
+    },
+    {
+      "attacker_side": "EDGR",
+      "attacker": "Degs224",
+      "defender_side": "EX",
+      "defender": "Jdong",
+      "winner_side": "EX",
+      "winner": "Jdong",
+      "loser_side": "EDGR",
+      "loser": "Degs224"
+    }
+  ]
+}
