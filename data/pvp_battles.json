@@ -19,6 +19,16 @@
       "winner": "Jdong",
       "loser_side": "EDGR",
       "loser": "Degs224"
+    },
+    {
+      "attacker_side": "EDGR",
+      "attacker": "ILM",
+      "defender_side": "EX",
+      "defender": "Loukoum92i",
+      "winner_side": "EX",
+      "winner": "Loukoum92i",
+      "loser_side": "EDGR",
+      "loser": "ILM"
     }
   ]
 }
